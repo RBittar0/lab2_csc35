@@ -143,34 +143,40 @@ ssize_t read_n(int fd, void *buf, size_t n) {
 int read_status_and_headers(int s, long *out_cl){
     char line[BUF_SIZE];
     ssize_t ln = read_line(s, line, sizeof(line));
-    if(ln <= 0) return -1;
+    if (ln <= 0) return -1;
 
-    if(strncmp(line, "MyOK", 4) == 0){
+    fputs(line, stderr);
+
+    if (strncmp(line, "MyOK", 4) == 0) {
         long content_len = -1;
-        while(1){
+        for (;;) {
             ln = read_line(s, line, sizeof(line));
-            if(ln <= 0) return -1;
+            if (ln <= 0) return -1;
 
-            if(strcmp(line, "\r\n") == 0 || strcmp(line, "\n") == 0) break; // encontrou o fimda linha;
+            /* fim dos headers */
+            if (strcmp(line, "\r\n") == 0 || strcmp(line, "\n") == 0) {
+                fputc('\n', stderr);   
+                break;
+            }
 
-            if(strncmp(line, "Content-Length:", 15) == 0){
+            fputs(line, stderr);  
+
+            if (strncmp(line, "Content-Length:", 15) == 0) {
                 const char *p = line + 15;
-                while(*p == ' ' || *p == '\t' || *p == ':') p++;
+                while (*p == ' ' || *p == '\t' || *p == ':') p++;
                 content_len = strtol(p, NULL, 10);
             }
         }
-
-        if(content_len < 0) {
-            fprintf(stderr, "missing Content-Length\n");
+        if (content_len < 0) {
+            fprintf(stderr, "bad headers: missing Content-Length\n");
             return -1;
         }
-
         *out_cl = content_len;
         return 1;
     }
 
-    if(strncmp(line, "Error:", 6) == 0){
-        fprintf(stderr, "%s", line);
+    if (strncmp(line, "Error:", 6) == 0 || strncmp(line, "ERROR", 5) == 0) {
+        /* já foi impresso acima com fputs(line, stderr); */
         return 0;
     }
 
